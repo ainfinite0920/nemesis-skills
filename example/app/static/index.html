@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>提示词管理系统 V2</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+        h1 { color: #333; margin-bottom: 20px; }
+        
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+        .tab { padding: 10px 20px; background: #fff; border: 1px solid #ddd; cursor: pointer; border-radius: 5px; }
+        .tab.active { background: #3B82F6; color: #fff; border-color: #3B82F6; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        
+        .card { background: #fff; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .card-title { font-size: 18px; font-weight: bold; }
+        
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: 500; }
+        .form-group input, .form-group select, .form-group textarea { 
+            width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;
+        }
+        .form-group textarea { min-height: 100px; resize: vertical; }
+        
+        .btn { padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 14px; margin: 2px; }
+        .btn-primary { background: #3B82F6; color: #fff; }
+        .btn-danger { background: #EF4444; color: #fff; }
+        .btn-success { background: #10B981; color: #fff; }
+        .btn-warning { background: #F59E0B; color: #fff; }
+        .btn:hover { opacity: 0.9; }
+        .btn-sm { padding: 5px 10px; font-size: 12px; }
+        
+        .search-box { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+        .search-box input, .search-box select { padding: 10px; border: 1px solid #ddd; border-radius: 5px; }
+        
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
+        th { background: #f9f9f9; font-weight: 600; }
+        .actions { display: flex; gap: 5px; flex-wrap: wrap; }
+        
+        .tag { display: inline-block; padding: 3px 8px; background: #3B82F6; color: #fff; border-radius: 3px; font-size: 12px; margin: 2px; }
+        .type-badge { padding: 3px 8px; border-radius: 3px; font-size: 12px; color: #fff; }
+        .type-image { background: #10B981; }
+        .type-video { background: #F59E0B; }
+        .type-code { background: #8B5CF6; }
+        .status-badge { padding: 3px 8px; border-radius: 3px; font-size: 12px; color: #fff; }
+        .status-draft { background: #6B7280; }
+        .status-active { background: #10B981; }
+        .status-archived { background: #EF4444; }
+        .status-completed { background: #10B981; }
+        .status-running { background: #3B82F6; }
+        .status-failed { background: #EF4444; }
+        
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; }
+        .modal.show { display: flex; justify-content: center; align-items: center; }
+        .modal-content { background: #fff; padding: 20px; border-radius: 8px; width: 90%; max-width: 600px; max-height: 90vh; overflow-y: auto; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .modal-close { font-size: 24px; cursor: pointer; }
+        
+        .variable-item { background: #f5f5f5; padding: 10px; margin-bottom: 10px; border-radius: 5px; }
+        .variable-item .form-group { margin-bottom: 8px; }
+        .variable-row { display: flex; gap: 10px; flex-wrap: wrap; }
+        .variable-row .form-group { flex: 1; min-width: 120px; margin-bottom: 0; }
+        
+        .step-item { background: #f5f5f5; padding: 10px; margin-bottom: 10px; border-radius: 5px; border-left: 3px solid #3B82F6; }
+        
+        pre { background: #f5f5f5; padding: 10px; border-radius: 5px; white-space: pre-wrap; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>提示词管理系统 V2</h1>
+        
+        <div class="tabs">
+            <div class="tab active" onclick="showTab('prompts')">提示词</div>
+            <div class="tab" onclick="showTab('templates')">模板</div>
+            <div class="tab" onclick="showTab('workflows')">工作流</div>
+            <div class="tab" onclick="showTab('categories')">分类</div>
+            <div class="tab" onclick="showTab('tags')">标签</div>
+            <div class="tab" onclick="showTab('models')">模型</div>
+        </div>
+        
+        <!-- 提示词管理 -->
+        <div id="prompts" class="tab-content active">
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">搜索提示词</span>
+                </div>
+                <div class="search-box">
+                    <input type="text" id="searchQ" placeholder="关键词搜索..." style="width: 200px;">
+                    <select id="searchType"><option value="">全部类型</option><option value="image">生图</option><option value="video">视频</option><option value="code">代码</option></select>
+                    <select id="searchCategory"></select>
+                    <select id="searchModel"></select>
+                    <button class="btn btn-primary" onclick="searchPrompts()">搜索</button>
+                    <button class="btn btn-success" onclick="showPromptModal()">新建提示词</button>
+                    <button class="btn btn-warning" onclick="exportPrompts('json')">导出JSON</button>
+                    <button class="btn btn-warning" onclick="exportPrompts('csv')">导出CSV</button>
+                    <button class="btn btn-warning" onclick="exportPrompts('markdown')">导出MD</button>
+                    <button class="btn btn-primary" onclick="showImportModal()">导入</button>
+                </div>
+            </div>
+            <div class="card">
+                <table>
+                    <thead><tr><th>标题</th><th>类型</th><th>分类</th><th>模型</th><th>标签</th><th>操作</th></tr></thead>
+                    <tbody id="promptsList"></tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- 模板管理 -->
+        <div id="templates" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">模板管理</span>
+                    <button class="btn btn-success" onclick="showTemplateModal()">新建模板</button>
+                </div>
+                <table>
+                    <thead><tr><th>标题</th><th>类型</th><th>变量数</th><th>描述</th><th>操作</th></tr></thead>
+                    <tbody id="templatesList"></tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- 工作流管理 -->
+        <div id="workflows" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">工作流管理</span>
+                    <button class="btn btn-success" onclick="showWorkflowModal()">新建工作流</button>
+                </div>
+                <table>
+                    <thead><tr><th>名称</th><th>类型</th><th>状态</th><th>步骤数</th><th>操作</th></tr></thead>
+                    <tbody id="workflowsList"></tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- 分类管理 -->
+        <div id="categories" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">分类管理</span>
+                    <button class="btn btn-success" onclick="showCategoryModal()">新建分类</button>
+                </div>
+                <table><thead><tr><th>名称</th><th>类型</th><th>描述</th><th>操作</th></tr></thead><tbody id="categoriesList"></tbody></table>
+            </div>
+        </div>
+        
+        <!-- 标签管理 -->
+        <div id="tags" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">标签管理</span>
+                    <button class="btn btn-success" onclick="showTagModal()">新建标签</button>
+                </div>
+                <table><thead><tr><th>名称</th><th>颜色</th><th>操作</th></tr></thead><tbody id="tagsList"></tbody></table>
+            </div>
+        </div>
+        
+        <!-- 模型管理 -->
+        <div id="models" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">模型管理</span>
+                    <button class="btn btn-success" onclick="showModelModal()">新建模型</button>
+                </div>
+                <table><thead><tr><th>名称</th><th>类型</th><th>提供商</th><th>描述</th><th>操作</th></tr></thead><tbody id="modelsList"></tbody></table>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 提示词Modal -->
+    <div id="promptModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="card-title" id="promptModalTitle">新建提示词</span>
+                <span class="modal-close" onclick="closeModal('promptModal')">&times;</span>
+            </div>
+            <input type="hidden" id="promptId">
+            <div class="form-group"><label>标题</label><input type="text" id="promptTitle"></div>
+            <div class="form-group"><label>类型</label><select id="promptType"><option value="image">生图</option><option value="video">视频</option><option value="code">代码</option></select></div>
+            <div class="form-group"><label>内容</label><textarea id="promptContent"></textarea></div>
+            <div class="form-group"><label>描述</label><textarea id="promptDescription"></textarea></div>
+            <div class="form-group"><label>分类</label><select id="promptCategory"></select></div>
+            <div class="form-group"><label>模型</label><select id="promptModel"></select></div>
+            <div class="form-group"><label>附件</label><input type="file" id="promptFile" multiple accept="image/*,video/*"></div>
+            <button class="btn btn-primary" onclick="savePrompt()">保存</button>
+        </div>
+    </div>
+    
+    <!-- 模板Modal -->
+    <div id="templateModal" class="modal">
+        <div class="modal-content" style="max-width: 700px;">
+            <div class="modal-header">
+                <span class="card-title" id="templateModalTitle">新建模板</span>
+                <span class="modal-close" onclick="closeModal('templateModal')">&times;</span>
+            </div>
+            <input type="hidden" id="templateId">
+            <div class="form-group"><label>标题</label><input type="text" id="templateTitle"></div>
+            <div class="form-group"><label>类型</label><select id="templateType"><option value="image">生图</option><option value="video">视频</option><option value="code">代码</option></select></div>
+            <div class="form-group"><label>内容 (使用 {{变量名}} 作为占位符)</label><textarea id="templateContent" style="min-height: 120px;" placeholder="生成一张{{style}}风格的{{subject}}图片"></textarea></div>
+            <div class="form-group"><label>描述</label><textarea id="templateDescription"></textarea></div>
+            <div class="form-group">
+                <label>变量定义 <button class="btn btn-sm btn-success" onclick="addVariable()">+ 添加变量</button></label>
+                <div id="variablesList"></div>
+            </div>
+            <button class="btn btn-primary" onclick="saveTemplate()">保存</button>
+        </div>
+    </div>
+    
+    <!-- 实例化Modal -->
+    <div id="instantiateModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="card-title">实例化模板</span>
+                <span class="modal-close" onclick="closeModal('instantiateModal')">&times;</span>
+            </div>
+            <input type="hidden" id="instantiateTemplateId">
+            <div id="instantiateFields"></div>
+            <div class="form-group">
+                <label><input type="checkbox" id="saveAsPrompt"> 保存为提示词</label>
+            </div>
+            <div class="form-group" id="promptTitleField" style="display:none;">
+                <label>提示词标题</label>
+                <input type="text" id="instantiatedPromptTitle">
+            </div>
+            <button class="btn btn-primary" onclick="instantiateTemplate()">生成</button>
+        </div>
+    </div>
+    
+    <!-- 工作流Modal -->
+    <div id="workflowModal" class="modal">
+        <div class="modal-content" style="max-width: 700px;">
+            <div class="modal-header">
+                <span class="card-title" id="workflowModalTitle">新建工作流</span>
+                <span class="modal-close" onclick="closeModal('workflowModal')">&times;</span>
+            </div>
+            <input type="hidden" id="workflowId">
+            <div class="form-group"><label>名称</label><input type="text" id="workflowName"></div>
+            <div class="form-group"><label>类型</label><select id="workflowType"><option value="image">生图</option><option value="video">视频</option><option value="code">代码</option></select></div>
+            <div class="form-group"><label>描述</label><textarea id="workflowDescription"></textarea></div>
+            <div class="form-group">
+                <label>步骤 <button class="btn btn-sm btn-success" onclick="addWorkflowStep()">+ 添加步骤</button></label>
+                <div id="workflowSteps"></div>
+            </div>
+            <button class="btn btn-primary" onclick="saveWorkflow()">保存</button>
+        </div>
+    </div>
+    
+    <!-- 执行Modal -->
+    <div id="executeModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="card-title">执行工作流</span>
+                <span class="modal-close" onclick="closeModal('executeModal')">&times;</span>
+            </div>
+            <input type="hidden" id="executeWorkflowId">
+            <div id="executeInputs"></div>
+            <button class="btn btn-primary" onclick="executeWorkflow()">执行</button>
+        </div>
+    </div>
+    
+    <!-- 导入Modal -->
+    <div id="importModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="card-title">导入数据</span>
+                <span class="modal-close" onclick="closeModal('importModal')">&times;</span>
+            </div>
+            <div class="form-group">
+                <label>JSON数据</label>
+                <textarea id="importData" style="min-height: 200px;" placeholder='{"prompts": [...], "templates": [...]}'></textarea>
+            </div>
+            <button class="btn btn-primary" onclick="importData()">导入</button>
+        </div>
+    </div>
+    
+    <!-- 详情Modal -->
+    <div id="detailModal" class="modal">
+        <div class="modal-content" style="max-width: 700px;">
+            <div class="modal-header">
+                <span class="card-title">详情</span>
+                <span class="modal-close" onclick="closeModal('detailModal')">&times;</span>
+            </div>
+            <div id="detailContent"></div>
+        </div>
+    </div>
+    
+    <!-- 其他Modal保持不变 -->
+    <div id="categoryModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header"><span class="card-title" id="categoryModalTitle">新建分类</span><span class="modal-close" onclick="closeModal('categoryModal')">&times;</span></div>
+            <input type="hidden" id="categoryId">
+            <div class="form-group"><label>名称</label><input type="text" id="categoryName"></div>
+            <div class="form-group"><label>类型</label><select id="categoryType"><option value="image">生图</option><option value="video">视频</option><option value="code">代码</option></select></div>
+            <div class="form-group"><label>描述</label><textarea id="categoryDescription"></textarea></div>
+            <button class="btn btn-primary" onclick="saveCategory()">保存</button>
+        </div>
+    </div>
+    
+    <div id="tagModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header"><span class="card-title">新建标签</span><span class="modal-close" onclick="closeModal('tagModal')">&times;</span></div>
+            <input type="hidden" id="tagId">
+            <div class="form-group"><label>名称</label><input type="text" id="tagName"></div>
+            <div class="form-group"><label>颜色</label><input type="color" id="tagColor" value="#3B82F6"></div>
+            <button class="btn btn-primary" onclick="saveTag()">保存</button>
+        </div>
+    </div>
+    
+    <div id="modelModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header"><span class="card-title" id="modelModalTitle">新建模型</span><span class="modal-close" onclick="closeModal('modelModal')">&times;</span></div>
+            <input type="hidden" id="modelId">
+            <div class="form-group"><label>名称</label><input type="text" id="modelName"></div>
+            <div class="form-group"><label>类型</label><select id="modelType"><option value="image">生图</option><option value="video">视频</option><option value="code">代码</option></select></div>
+            <div class="form-group"><label>提供商</label><input type="text" id="modelProvider"></div>
+            <div class="form-group"><label>描述</label><textarea id="modelDescription"></textarea></div>
+            <button class="btn btn-primary" onclick="saveModel()">保存</button>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api';
+        let templatesData = [];
+        let promptsData = [];
+        
+        function showTab(tabId) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.querySelector(`.tab[onclick="showTab('${tabId}')"]`).classList.add('active');
+            document.getElementById(tabId).classList.add('active');
+        }
+        
+        function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+        function showModal(id) { document.getElementById(id).classList.add('show'); }
+        
+        function getTypeName(type) { return {image:'生图',video:'视频',code:'代码'}[type] || type; }
+        
+        // 提示词
+        async function loadPrompts() {
+            const res = await fetch(`${API_BASE}/prompts`);
+            promptsData = await res.json();
+            renderPrompts(promptsData);
+        }
+        
+        function renderPrompts(prompts) {
+            document.getElementById('promptsList').innerHTML = prompts.map(p => `
+                <tr>
+                    <td>${p.title}</td>
+                    <td><span class="type-badge type-${p.type}">${getTypeName(p.type)}</span></td>
+                    <td>${p.category?.name || '-'}</td>
+                    <td>${p.model?.name || '-'}</td>
+                    <td>${p.tags?.map(t => `<span class="tag" style="background:${t.color}">${t.name}</span>`).join('') || ''}</td>
+                    <td class="actions">
+                        <button class="btn btn-primary btn-sm" onclick="viewPrompt('${p.id}')">查看</button>
+                        <button class="btn btn-primary btn-sm" onclick="editPrompt('${p.id}')">编辑</button>
+                        <button class="btn btn-danger btn-sm" onclick="deletePrompt('${p.id}')">删除</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+        
+        async function searchPrompts() {
+            const q = document.getElementById('searchQ').value;
+            const type = document.getElementById('searchType').value;
+            const category_id = document.getElementById('searchCategory').value;
+            const model_id = document.getElementById('searchModel').value;
+            let url = `${API_BASE}/prompts/search?`;
+            if (q) url += `q=${encodeURIComponent(q)}&`;
+            if (type) url += `type=${type}&`;
+            if (category_id) url += `category_id=${category_id}&`;
+            if (model_id) url += `model_id=${model_id}&`;
+            const res = await fetch(url);
+            renderPrompts(await res.json());
+        }
+        
+        function showPromptModal() {
+            document.getElementById('promptModalTitle').textContent = '新建提示词';
+            document.getElementById('promptId').value = '';
+            document.getElementById('promptTitle').value = '';
+            document.getElementById('promptType').value = 'image';
+            document.getElementById('promptContent').value = '';
+            document.getElementById('promptDescription').value = '';
+            document.getElementById('promptCategory').value = '';
+            document.getElementById('promptModel').value = '';
+            showModal('promptModal');
+        }
+        
+        async function editPrompt(id) {
+            const res = await fetch(`${API_BASE}/prompts/${id}`);
+            const p = await res.json();
+            document.getElementById('promptModalTitle').textContent = '编辑提示词';
+            document.getElementById('promptId').value = p.id;
+            document.getElementById('promptTitle').value = p.title;
+            document.getElementById('promptType').value = p.type;
+            document.getElementById('promptContent').value = p.content;
+            document.getElementById('promptDescription').value = p.description || '';
+            document.getElementById('promptCategory').value = p.category_id || '';
+            document.getElementById('promptModel').value = p.model_id || '';
+            showModal('promptModal');
+        }
+        
+        async function viewPrompt(id) {
+            const res = await fetch(`${API_BASE}/prompts/${id}`);
+            const p = await res.json();
+            document.getElementById('detailContent').innerHTML = `
+                <p><strong>标题：</strong>${p.title}</p>
+                <p><strong>类型：</strong><span class="type-badge type-${p.type}">${getTypeName(p.type)}</span></p>
+                <p><strong>内容：</strong></p>
+                <pre>${p.content}</pre>
+                <p><strong>描述：</strong>${p.description || '-'}</p>
+                <p><strong>标签：</strong>${p.tags?.map(t => `<span class="tag" style="background:${t.color}">${t.name}</span>`).join('') || '-'}</p>
+            `;
+            showModal('detailModal');
+        }
+        
+        async function savePrompt() {
+            const id = document.getElementById('promptId').value;
+            const data = {
+                title: document.getElementById('promptTitle').value,
+                type: document.getElementById('promptType').value,
+                content: document.getElementById('promptContent').value,
+                description: document.getElementById('promptDescription').value,
+                category_id: document.getElementById('promptCategory').value || null,
+                model_id: document.getElementById('promptModel').value || null
+            };
+            if (id) {
+                await fetch(`${API_BASE}/prompts/${id}`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data) });
+            } else {
+                await fetch(`${API_BASE}/prompts`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data) });
+            }
+            closeModal('promptModal');
+            loadPrompts();
+        }
+        
+        async function deletePrompt(id) {
+            if (confirm('确定删除？')) {
+                await fetch(`${API_BASE}/prompts/${id}`, { method: 'DELETE' });
+                loadPrompts();
+            }
+        }
+        
+        // 模板
+        async function loadTemplates() {
+            const res = await fetch(`${API_BASE}/templates`);
+            templatesData = await res.json();
+            document.getElementById('templatesList').innerHTML = templatesData.map(t => `
+                <tr>
+                    <td>${t.title}</td>
+                    <td><span class="type-badge type-${t.type}">${getTypeName(t.type)}</span></td>
+                    <td>${t.variables?.length || 0}</td>
+                    <td>${t.description || '-'}</td>
+                    <td class="actions">
+                        <button class="btn btn-success btn-sm" onclick="showInstantiateModal('${t.id}')">实例化</button>
+                        <button class="btn btn-primary btn-sm" onclick="editTemplate('${t.id}')">编辑</button>
+                        <button class="btn btn-danger btn-sm" onclick="deleteTemplate('${t.id}')">删除</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+        
+        let variableCount = 0;
+        
+        function showTemplateModal() {
+            document.getElementById('templateModalTitle').textContent = '新建模板';
+            document.getElementById('templateId').value = '';
+            document.getElementById('templateTitle').value = '';
+            document.getElementById('templateType').value = 'image';
+            document.getElementById('templateContent').value = '';
+            document.getElementById('templateDescription').value = '';
+            document.getElementById('variablesList').innerHTML = '';
+            variableCount = 0;
+            showModal('templateModal');
+        }
+        
+        function addVariable(v = {}) {
+            const id = variableCount++;
+            const html = `
+                <div class="variable-item" id="var-${id}">
+                    <div class="variable-row">
+                        <div class="form-group"><label>变量名</label><input type="text" class="var-name" value="${v.name || ''}" placeholder="变量名"></div>
+                        <div class="form-group"><label>类型</label>
+                            <select class="var-type" onchange="toggleVarOptions(${id}, this.value)">
+                                <option value="text" ${v.type==='text'?'selected':''}>文本</option>
+                                <option value="number" ${v.type==='number'?'selected':''}>数字</option>
+                                <option value="select" ${v.type==='select'?'selected':''}>下拉选择</option>
+                                <option value="boolean" ${v.type==='boolean'?'selected':''}>布尔值</option>
+                            </select>
+                        </div>
+                        <div class="form-group"><label>必填</label><input type="checkbox" class="var-required" ${v.required?'checked':''}></div>
+                    </div>
+                    <div class="variable-row">
+                        <div class="form-group"><label>标签</label><input type="text" class="var-label" value="${v.label || ''}" placeholder="显示标签"></div>
+                        <div class="form-group"><label>默认值</label><input type="text" class="var-default" value="${v.default ?? ''}"></div>
+                        <div class="form-group var-options-div" id="var-options-${id}" style="display:${v.type==='select'?'block':'none'};">
+                            <label>选项(逗号分隔)</label><input type="text" class="var-options" value="${v.options?.join(',') || ''}" placeholder="选项1,选项2">
+                        </div>
+                    </div>
+                    <button class="btn btn-danger btn-sm" onclick="document.getElementById('var-${id}').remove()">删除</button>
+                </div>
+            `;
+            document.getElementById('variablesList').insertAdjacentHTML('beforeend', html);
+        }
+        
+        function toggleVarOptions(id, type) {
+            document.getElementById(`var-options-${id}`).style.display = type === 'select' ? 'block' : 'none';
+        }
+        
+        async function editTemplate(id) {
+            const t = templatesData.find(x => x.id === id);
+            document.getElementById('templateModalTitle').textContent = '编辑模板';
+            document.getElementById('templateId').value = t.id;
+            document.getElementById('templateTitle').value = t.title;
+            document.getElementById('templateType').value = t.type;
+            document.getElementById('templateContent').value = t.content;
+            document.getElementById('templateDescription').value = t.description || '';
+            document.getElementById('variablesList').innerHTML = '';
+            variableCount = 0;
+            (t.variables || []).forEach(v => addVariable(v));
+            showModal('templateModal');
+        }
+        
+        function getVariables() {
+            const vars = [];
+            document.querySelectorAll('.variable-item').forEach(item => {
+                vars.push({
+                    name: item.querySelector('.var-name').value,
+                    type: item.querySelector('.var-type').value,
+                    label: item.querySelector('.var-label').value,
+                    required: item.querySelector('.var-required').checked,
+                    default: item.querySelector('.var-default').value || null,
+                    options: item.querySelector('.var-options')?.value?.split(',').filter(x => x) || null
+                });
+            });
+            return vars;
+        }
+        
+        async function saveTemplate() {
+            const id = document.getElementById('templateId').value;
+            const data = {
+                title: document.getElementById('templateTitle').value,
+                type: document.getElementById('templateType').value,
+                content: document.getElementById('templateContent').value,
+                description: document.getElementById('templateDescription').value,
+                variables: getVariables()
+            };
+            if (id) {
+                await fetch(`${API_BASE}/templates/${id}`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data) });
+            } else {
+                await fetch(`${API_BASE}/templates`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data) });
+            }
+            closeModal('templateModal');
+            loadTemplates();
+        }
+        
+        async function deleteTemplate(id) {
+            if (confirm('确定删除？')) {
+                await fetch(`${API_BASE}/templates/${id}`, { method: 'DELETE' });
+                loadTemplates();
+            }
+        }
+        
+        function showInstantiateModal(templateId) {
+            const t = templatesData.find(x => x.id === templateId);
+            document.getElementById('instantiateTemplateId').value = templateId;
+            let html = `<p><strong>模板：</strong>${t.title}</p><p><strong>内容模板：</strong><pre>${t.content}</pre></p>`;
+            (t.variables || []).forEach(v => {
+                if (v.type === 'select') {
+                    html += `<div class="form-group"><label>${v.label || v.name}${v.required?' *':''}</label>
+                        <select id="inst-${v.name}"><option value="">请选择</option>
+                        ${(v.options || []).map(o => `<option value="${o}" ${o===v.default?'selected':''}>${o}</option>`).join('')}
+                        </select></div>`;
+                } else if (v.type === 'boolean') {
+                    html += `<div class="form-group"><label>${v.label || v.name}</label>
+                        <select id="inst-${v.name}"><option value="true">是</option><option value="false">否</option></select></div>`;
+                } else {
+                    html += `<div class="form-group"><label>${v.label || v.name}${v.required?' *':''}</label>
+                        <input type="${v.type==='number'?'number':'text'}" id="inst-${v.name}" value="${v.default || ''}"></div>`;
+                }
+            });
+            html += `<div class="form-group"><label><input type="checkbox" id="saveAsPrompt" onchange="document.getElementById('promptTitleField').style.display=this.checked?'block':'none'"> 保存为提示词</label></div>`;
+            html += `<div class="form-group" id="promptTitleField" style="display:none;"><label>提示词标题</label><input type="text" id="instantiatedPromptTitle"></div>`;
+            document.getElementById('instantiateFields').innerHTML = html;
+            showModal('instantiateModal');
+        }
+        
+        async function instantiateTemplate() {
+            const templateId = document.getElementById('instantiateTemplateId').value;
+            const t = templatesData.find(x => x.id === templateId);
+            const vars = {};
+            (t.variables || []).forEach(v => {
+                const el = document.getElementById(`inst-${v.name}`);
+                vars[v.name] = v.type === 'boolean' ? el.value === 'true' : (v.type === 'number' ? parseFloat(el.value) : el.value);
+            });
+            const data = {
+                variables: vars,
+                save_as_prompt: document.getElementById('saveAsPrompt').checked,
+                prompt_title: document.getElementById('instantiatedPromptTitle').value
+            };
+            const res = await fetch(`${API_BASE}/templates/${templateId}/instantiate`, {
+                method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data)
+            });
+            const result = await res.json();
+            document.getElementById('detailContent').innerHTML = `<h3>生成结果</h3><pre>${result.content}</pre>${result.prompt_id ? `<p>已保存为提示词，ID: ${result.prompt_id}</p>` : ''}`;
+            closeModal('instantiateModal');
+            showModal('detailModal');
+            loadPrompts();
+        }
+        
+        // 工作流
+        async function loadWorkflows() {
+            const res = await fetch(`${API_BASE}/workflows`);
+            const data = await res.json();
+            document.getElementById('workflowsList').innerHTML = data.map(w => `
+                <tr>
+                    <td>${w.name}</td>
+                    <td><span class="type-badge type-${w.type}">${getTypeName(w.type)}</span></td>
+                    <td><span class="status-badge status-${w.status}">${w.status}</span></td>
+                    <td>${w.steps?.length || 0}</td>
+                    <td class="actions">
+                        <button class="btn btn-success btn-sm" onclick="executeWorkflowDirect('${w.id}')" ${w.status!=='active'?'disabled':''}>执行</button>
+                        <button class="btn btn-primary btn-sm" onclick="viewWorkflowExecutions('${w.id}')">历史</button>
+                        <button class="btn btn-primary btn-sm" onclick="editWorkflow('${w.id}')">编辑</button>
+                        <button class="btn btn-danger btn-sm" onclick="deleteWorkflow('${w.id}')">删除</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+        
+        let stepCount = 0;
+        
+        function showWorkflowModal() {
+            document.getElementById('workflowModalTitle').textContent = '新建工作流';
+            document.getElementById('workflowId').value = '';
+            document.getElementById('workflowName').value = '';
+            document.getElementById('workflowType').value = 'image';
+            document.getElementById('workflowDescription').value = '';
+            document.getElementById('workflowSteps').innerHTML = '';
+            stepCount = 0;
+            showModal('workflowModal');
+        }
+        
+        function addWorkflowStep(s = {}) {
+            const id = stepCount++;
+            const templateOptions = templatesData.map(t => `<option value="${t.id}" ${s.template_id===t.id?'selected':''}>${t.title}</option>`).join('');
+            const promptOptions = promptsData.map(p => `<option value="${p.id}" ${s.prompt_id===p.id?'selected':''}>${p.title}</option>`).join('');
+            const html = `
+                <div class="step-item" id="step-${id}">
+                    <div class="variable-row">
+                        <div class="form-group"><label>步骤ID</label><input type="text" class="step-id" value="${s.id || `step_${id+1}`}"></div>
+                        <div class="form-group"><label>名称</label><input type="text" class="step-name" value="${s.name || ''}"></div>
+                        <div class="form-group"><label>顺序</label><input type="number" class="step-order" value="${s.order || id+1}" style="width:60px;"></div>
+                    </div>
+                    <div class="variable-row">
+                        <div class="form-group"><label>类型</label>
+                            <select class="step-type" onchange="toggleStepRefs(${id}, this.value)">
+                                <option value="template" ${s.type==='template'?'selected':''}>模板</option>
+                                <option value="prompt" ${s.type==='prompt'?'selected':''}>提示词</option>
+                            </select>
+                        </div>
+                        <div class="form-group step-template-div" id="step-template-${id}">
+                            <label>选择模板</label><select class="step-template-id"><option value="">无</option>${templateOptions}</select>
+                        </div>
+                        <div class="form-group step-prompt-div" id="step-prompt-${id}" style="display:none;">
+                            <label>选择提示词</label><select class="step-prompt-id"><option value="">无</option>${promptOptions}</select>
+                        </div>
+                    </div>
+                    <button class="btn btn-danger btn-sm" onclick="document.getElementById('step-${id}').remove()">删除</button>
+                </div>
+            `;
+            document.getElementById('workflowSteps').insertAdjacentHTML('beforeend', html);
+            if (s.type === 'prompt') toggleStepRefs(id, 'prompt');
+        }
+        
+        function toggleStepRefs(id, type) {
+            document.getElementById(`step-template-${id}`).style.display = type === 'template' ? 'block' : 'none';
+            document.getElementById(`step-prompt-${id}`).style.display = type === 'prompt' ? 'block' : 'none';
+        }
+        
+        async function editWorkflow(id) {
+            const res = await fetch(`${API_BASE}/workflows/${id}`);
+            const w = await res.json();
+            document.getElementById('workflowModalTitle').textContent = '编辑工作流';
+            document.getElementById('workflowId').value = w.id;
+            document.getElementById('workflowName').value = w.name;
+            document.getElementById('workflowType').value = w.type;
+            document.getElementById('workflowDescription').value = w.description || '';
+            document.getElementById('workflowSteps').innerHTML = '';
+            stepCount = 0;
+            (w.steps || []).forEach(s => addWorkflowStep(s));
+            showModal('workflowModal');
+        }
+        
+        function getSteps() {
+            const steps = [];
+            document.querySelectorAll('.step-item').forEach(item => {
+                const type = item.querySelector('.step-type').value;
+                steps.push({
+                    id: item.querySelector('.step-id').value,
+                    name: item.querySelector('.step-name').value,
+                    type: type,
+                    order: parseInt(item.querySelector('.step-order').value),
+                    template_id: type === 'template' ? item.querySelector('.step-template-id').value || null : null,
+                    prompt_id: type === 'prompt' ? item.querySelector('.step-prompt-id').value || null : null,
+                    inputs: {},
+                    outputs: []
+                });
+            });
+            return steps.sort((a, b) => a.order - b.order);
+        }
+        
+        async function saveWorkflow() {
+            const id = document.getElementById('workflowId').value;
+            const data = {
+                name: document.getElementById('workflowName').value,
+                type: document.getElementById('workflowType').value,
+                description: document.getElementById('workflowDescription').value,
+                steps: getSteps()
+            };
+            if (id) {
+                await fetch(`${API_BASE}/workflows/${id}`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data) });
+            } else {
+                const res = await fetch(`${API_BASE}/workflows`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data) });
+                const w = await res.json();
+                // 激活工作流
+                await fetch(`${API_BASE}/workflows/${w.id}`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({status: 'active'}) });
+            }
+            closeModal('workflowModal');
+            loadWorkflows();
+        }
+        
+        async function deleteWorkflow(id) {
+            if (confirm('确定删除？')) {
+                await fetch(`${API_BASE}/workflows/${id}`, { method: 'DELETE' });
+                loadWorkflows();
+            }
+        }
+        
+        async function executeWorkflowDirect(id) {
+            const res = await fetch(`${API_BASE}/workflows/${id}/execute`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({inputs: {}}) });
+            const result = await res.json();
+            document.getElementById('detailContent').innerHTML = `<h3>执行结果</h3><p>状态：<span class="status-badge status-${result.status}">${result.status}</span></p><pre>${JSON.stringify(result, null, 2)}</pre>`;
+            showModal('detailModal');
+        }
+        
+        async function viewWorkflowExecutions(id) {
+            const res = await fetch(`${API_BASE}/workflows/${id}/executions`);
+            const data = await res.json();
+            let html = `<h3>执行历史</h3><table><thead><tr><th>状态</th><th>开始时间</th><th>完成时间</th></tr></thead><tbody>`;
+            data.forEach(e => {
+                html += `<tr><td><span class="status-badge status-${e.status}">${e.status}</span></td><td>${e.started_at || '-'}</td><td>${e.completed_at || '-'}</td></tr>`;
+            });
+            html += '</tbody></table>';
+            document.getElementById('detailContent').innerHTML = html;
+            showModal('detailModal');
+        }
+        
+        // 导入导出
+        function exportPrompts(format) {
+            window.location.href = `${API_BASE}/export?format=${format}`;
+        }
+        
+        function showImportModal() {
+            document.getElementById('importData').value = '';
+            showModal('importModal');
+        }
+        
+        async function importData() {
+            try {
+                const data = JSON.parse(document.getElementById('importData').value);
+                const res = await fetch(`${API_BASE}/import`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data) });
+                const result = await res.json();
+                alert(`导入成功！提示词:${result.stats.prompts}, 模板:${result.stats.templates}, 分类:${result.stats.categories}, 标签:${result.stats.tags}`);
+                closeModal('importModal');
+                loadPrompts();
+                loadTemplates();
+                loadCategories();
+                loadTags();
+            } catch (e) {
+                alert('JSON格式错误: ' + e.message);
+            }
+        }
+        
+        // 分类、标签、模型（保持原有逻辑）
+        async function loadCategories() {
+            const res = await fetch(`${API_BASE}/categories`);
+            const data = await res.json();
+            document.getElementById('categoriesList').innerHTML = data.map(c => `
+                <tr><td>${c.name}</td><td><span class="type-badge type-${c.type}">${getTypeName(c.type)}</span></td><td>${c.description || '-'}</td>
+                <td class="actions"><button class="btn btn-primary btn-sm" onclick="editCategory('${c.id}')">编辑</button><button class="btn btn-danger btn-sm" onclick="deleteCategory('${c.id}')">删除</button></td></tr>
+            `).join('');
+            const html = '<option value="">全部分类</option>' + data.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+            document.getElementById('searchCategory').innerHTML = html;
+            document.getElementById('promptCategory').innerHTML = '<option value="">无分类</option>' + data.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+        }
+        
+        function showCategoryModal() {
+            document.getElementById('categoryModalTitle').textContent = '新建分类';
+            document.getElementById('categoryId').value = '';
+            document.getElementById('categoryName').value = '';
+            document.getElementById('categoryType').value = 'image';
+            document.getElementById('categoryDescription').value = '';
+            showModal('categoryModal');
+        }
+        
+        async function editCategory(id) {
+            const res = await fetch(`${API_BASE}/categories/${id}`);
+            const c = await res.json();
+            document.getElementById('categoryModalTitle').textContent = '编辑分类';
+            document.getElementById('categoryId').value = c.id;
+            document.getElementById('categoryName').value = c.name;
+            document.getElementById('categoryType').value = c.type;
+            document.getElementById('categoryDescription').value = c.description || '';
+            showModal('categoryModal');
+        }
+        
+        async function saveCategory() {
+            const id = document.getElementById('categoryId').value;
+            const data = { name: document.getElementById('categoryName').value, type: document.getElementById('categoryType').value, description: document.getElementById('categoryDescription').value };
+            if (id) {
+                await fetch(`${API_BASE}/categories/${id}`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data) });
+            } else {
+                await fetch(`${API_BASE}/categories`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data) });
+            }
+            closeModal('categoryModal');
+            loadCategories();
+        }
+        
+        async function deleteCategory(id) {
+            if (confirm('确定删除？')) { await fetch(`${API_BASE}/categories/${id}`, { method: 'DELETE' }); loadCategories(); }
+        }
+        
+        async function loadTags() {
+            const res = await fetch(`${API_BASE}/tags`);
+            const data = await res.json();
+            document.getElementById('tagsList').innerHTML = data.map(t => `
+                <tr><td><span class="tag" style="background:${t.color}">${t.name}</span></td>
+                <td><span style="display:inline-block;width:30px;height:20px;background:${t.color};border-radius:3px;"></span> ${t.color}</td>
+                <td class="actions"><button class="btn btn-primary btn-sm" onclick="editTag('${t.id}')">编辑</button><button class="btn btn-danger btn-sm" onclick="deleteTag('${t.id}')">删除</button></td></tr>
+            `).join('');
+        }
+        
+        function showTagModal() {
+            document.getElementById('tagId').value = '';
+            document.getElementById('tagName').value = '';
+            document.getElementById('tagColor').value = '#3B82F6';
+            showModal('tagModal');
+        }
+        
+        async function editTag(id) {
+            const res = await fetch(`${API_BASE}/tags/${id}`);
+            const t = await res.json();
+            document.getElementById('tagId').value = t.id;
+            document.getElementById('tagName').value = t.name;
+            document.getElementById('tagColor').value = t.color;
+            showModal('tagModal');
+        }
+        
+        async function saveTag() {
+            const id = document.getElementById('tagId').value;
+            const data = { name: document.getElementById('tagName').value, color: document.getElementById('tagColor').value };
+            if (id) {
+                await fetch(`${API_BASE}/tags/${id}`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data) });
+            } else {
+                await fetch(`${API_BASE}/tags`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data) });
+            }
+            closeModal('tagModal');
+            loadTags();
+        }
+        
+        async function deleteTag(id) {
+            if (confirm('确定删除？')) { await fetch(`${API_BASE}/tags/${id}`, { method: 'DELETE' }); loadTags(); }
+        }
+        
+        async function loadModels() {
+            const res = await fetch(`${API_BASE}/models`);
+            const data = await res.json();
+            document.getElementById('modelsList').innerHTML = data.map(m => `
+                <tr><td>${m.name}</td><td><span class="type-badge type-${m.type}">${getTypeName(m.type)}</span></td><td>${m.provider}</td><td>${m.description || '-'}</td>
+                <td class="actions"><button class="btn btn-primary btn-sm" onclick="editModel('${m.id}')">编辑</button><button class="btn btn-danger btn-sm" onclick="deleteModel('${m.id}')">删除</button></td></tr>
+            `).join('');
+            const html = '<option value="">全部模型</option>' + data.map(m => `<option value="${m.id}">${m.name}</option>`).join('');
+            document.getElementById('searchModel').innerHTML = html;
+            document.getElementById('promptModel').innerHTML = '<option value="">无模型</option>' + data.map(m => `<option value="${m.id}">${m.name}</option>`).join('');
+        }
+        
+        function showModelModal() {
+            document.getElementById('modelModalTitle').textContent = '新建模型';
+            document.getElementById('modelId').value = '';
+            document.getElementById('modelName').value = '';
+            document.getElementById('modelType').value = 'image';
+            document.getElementById('modelProvider').value = '';
+            document.getElementById('modelDescription').value = '';
+            showModal('modelModal');
+        }
+        
+        async function editModel(id) {
+            const res = await fetch(`${API_BASE}/models/${id}`);
+            const m = await res.json();
+            document.getElementById('modelModalTitle').textContent = '编辑模型';
+            document.getElementById('modelId').value = m.id;
+            document.getElementById('modelName').value = m.name;
+            document.getElementById('modelType').value = m.type;
+            document.getElementById('modelProvider').value = m.provider;
+            document.getElementById('modelDescription').value = m.description || '';
+            showModal('modelModal');
+        }
+        
+        async function saveModel() {
+            const id = document.getElementById('modelId').value;
+            const data = { name: document.getElementById('modelName').value, type: document.getElementById('modelType').value, provider: document.getElementById('modelProvider').value, description: document.getElementById('modelDescription').value };
+            if (id) {
+                await fetch(`${API_BASE}/models/${id}`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data) });
+            } else {
+                await fetch(`${API_BASE}/models`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data) });
+            }
+            closeModal('modelModal');
+            loadModels();
+        }
+        
+        async function deleteModel(id) {
+            if (confirm('确定删除？')) { await fetch(`${API_BASE}/models/${id}`, { method: 'DELETE' }); loadModels(); }
+        }
+        
+        // 初始化
+        loadPrompts();
+        loadCategories();
+        loadTags();
+        loadModels();
+        loadTemplates();
+        loadWorkflows();
+    </script>
+</body>
+</html>
